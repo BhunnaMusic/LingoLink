@@ -220,7 +220,7 @@ def highlight_text(original, flags):
     return "".join(parts).replace("\n", "<br>")
 
 
-def render_flag_card(flag):
+def render_flag_card(flag, index=0):
     """Return an HTML string for a single flag card."""
     sev     = flag.get("severity", "LOW")
     cat     = flag.get("category", "")
@@ -229,24 +229,46 @@ def render_flag_card(flag):
     rec     = html.escape(flag.get("recommendation", ""))
     border  = SEV_BORDER.get(sev, SEV_BORDER["LOW"])
     card_bg = SEV_CARD_BG.get(sev, SEV_CARD_BG["LOW"])
+    delay   = f"{index * 0.05:.2f}s"
+
+    # Category icon mapping
+    cat_icons = {
+        "FACE_RISK":            "◈",
+        "DIRECTNESS_MISMATCH":  "⇄",
+        "RELATIONSHIP_BYPASS":  "◎",
+        "HIERARCHY_VIOLATION":  "△",
+        "URGENCY_PRESSURE":     "◷",
+        "NEGATIVE_FRAMING":     "⊘",
+    }
+    icon = cat_icons.get(cat, "◆")
 
     return f"""
-<div style="background:{card_bg};border-left:3px solid {border};border-radius:6px;
-     padding:14px 16px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,0.2);">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-    <span style="background:{border};color:#1a1a2e;font-size:10px;font-weight:700;
-          padding:2px 8px;border-radius:10px;letter-spacing:0.5px;
+<div class="flag-card-animate" style="background:{card_bg};border-left:3px solid {border};
+     border-radius:8px;padding:14px 16px;margin-bottom:10px;
+     box-shadow:0 2px 12px rgba(0,0,0,0.25),0 0 0 1px rgba(255,255,255,0.03);
+     animation-delay:{delay};cursor:default;
+     transition:box-shadow 0.2s ease,transform 0.2s ease;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
+    <div style="display:flex;align-items:center;gap:7px;">
+      <span style="color:{border};font-size:14px;line-height:1;opacity:0.9;">{icon}</span>
+      <span style="color:{border};font-size:10px;font-weight:700;letter-spacing:0.8px;
+            text-transform:uppercase;font-family:'DM Sans',sans-serif;">{cat.replace("_", " ")}</span>
+    </div>
+    <span style="background:{border};color:#1a1a2e;font-size:9px;font-weight:800;
+          padding:2px 7px;border-radius:8px;letter-spacing:0.6px;
           font-family:'DM Sans',sans-serif;">{sev}</span>
-    <span style="color:{border};font-size:11px;font-weight:600;letter-spacing:0.7px;
-          font-family:'DM Sans',sans-serif;">{cat}</span>
   </div>
-  <p style="color:#a8b4d0;font-style:italic;font-size:13px;margin:0 0 8px;
-     font-family:'DM Sans',sans-serif;">"{phrase}"</p>
-  <p style="color:#c8d4e8;font-size:13px;line-height:1.6;margin:0 0 10px;
+  <p style="color:#8090b0;font-style:italic;font-size:12.5px;margin:0 0 9px;
+     line-height:1.55;font-family:'DM Sans',sans-serif;border-left:1px solid rgba(255,255,255,0.06);
+     padding-left:8px;">"{phrase}"</p>
+  <p style="color:#9aaac0;font-size:12.5px;line-height:1.65;margin:0 0 10px;
      font-family:'DM Sans',sans-serif;">{reason}</p>
-  <div style="background:rgba(255,255,255,0.05);border-radius:4px;padding:8px 12px;
-       border-left:2px solid rgba(255,255,255,0.12);">
-    <p style="color:#8eb8d4;font-size:12px;margin:0;line-height:1.5;
+  <div style="background:rgba(255,255,255,0.03);border-radius:5px;padding:9px 12px;
+       border:1px solid rgba(255,255,255,0.06);">
+    <span style="font-size:9px;font-weight:700;color:#3a5070;letter-spacing:0.8px;
+          text-transform:uppercase;display:block;margin-bottom:4px;
+          font-family:'DM Sans',sans-serif;">Suggestion</span>
+    <p style="color:#7aaccc;font-size:12.5px;margin:0;line-height:1.55;
        font-family:'DM Sans',sans-serif;">{rec}</p>
   </div>
 </div>"""
@@ -262,128 +284,300 @@ def inject_css():
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
 
-/* ── Global */
-html, body, [class*="css"] {
-    font-family: 'DM Sans', sans-serif;
+/* ── Motion preference ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 
-/* ── Hide default Streamlit chrome */
+/* ── Card entrance animation ── */
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.flag-card-animate { animation: fadeSlideUp 0.25s ease forwards; }
+
+/* ── Global ── */
+html, body, [class*="css"] {
+    font-family: 'DM Sans', sans-serif;
+    background-color: #1a1a2e;
+}
+
+/* ── Hide default Streamlit chrome ── */
 #MainMenu      { visibility: hidden; }
 footer         { visibility: hidden; }
 header         { visibility: hidden; }
 .stDeployButton { display: none; }
+[data-testid="stAppViewBlockContainer"] { padding-top: 1.5rem !important; }
+[data-testid="stMainBlockContainer"]   { padding-top: 0 !important; }
 
-/* ── Brand name */
+/* ── Top nav bar ── */
+.top-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0 20px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    margin-bottom: 24px;
+}
+.brand-lockup { display: flex; align-items: baseline; gap: 12px; }
 .brand-name {
     font-family: 'DM Serif Display', serif !important;
-    font-size: 2.5rem;
-    color: #e2b04a;
-    margin: 0 0 2px 0;
-    line-height: 1.1;
+    font-size: 2rem;
+    background: linear-gradient(135deg, #e2b04a 0%, #f5d07a 60%, #c8922a 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin: 0;
+    line-height: 1;
     letter-spacing: -0.5px;
 }
-
-/* ── Tagline */
+.brand-badge {
+    font-size: 9px;
+    font-weight: 700;
+    color: #1a1a2e;
+    background: #e2b04a;
+    padding: 2px 7px;
+    border-radius: 10px;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    font-family: 'DM Sans', sans-serif;
+    align-self: center;
+}
 .brand-tagline {
-    font-size: 0.95rem;
-    color: #6a7a98;
-    margin: 0 0 22px 0;
+    font-size: 0.82rem;
+    color: #4a5a78;
+    margin: 0;
     font-weight: 400;
+    letter-spacing: 0.1px;
+}
+.nav-right {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+.nav-pill {
+    font-size: 10px;
+    font-weight: 600;
+    color: #4a5a78;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    padding: 4px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.3px;
+    font-family: 'DM Sans', sans-serif;
 }
 
-/* ── Arrow separator in controls row */
+/* ── Controls card ── */
+.controls-card {
+    background: rgba(22, 33, 62, 0.8);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+    padding: 16px 20px 14px;
+    margin-bottom: 16px;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+}
+.controls-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: #2e3e5c;
+    letter-spacing: 1.3px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    font-family: 'DM Sans', sans-serif;
+}
+
+/* ── Country pair badge ── */
+.pair-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(226,176,74,0.07);
+    border: 1px solid rgba(226,176,74,0.15);
+    border-radius: 20px;
+    padding: 4px 12px 4px 8px;
+    font-size: 11px;
+    color: #a89060;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+}
+.pair-arrow { color: #e2b04a; font-size: 10px; opacity: 0.8; }
+
+/* ── Arrow separator in controls row ── */
 .arrow-sep {
-    font-size: 1.3rem;
+    font-size: 1.1rem;
     color: #e2b04a;
     text-align: center;
-    padding-top: 30px;
-    opacity: 0.7;
+    padding-top: 28px;
+    opacity: 0.5;
+    user-select: none;
 }
 
-/* ── Annotated text display panel */
-.text-panel {
-    background: #16213e;
-    border-radius: 8px;
-    padding: 20px 22px;
-    border: 1px solid rgba(255,255,255,0.07);
-    min-height: 400px;
-    font-size: 14px;
-    line-height: 1.8;
-    color: #c8d4e8;
-    word-wrap: break-word;
+/* ── Severity legend ── */
+.legend-bar {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    padding: 7px 14px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.04);
+    margin: 0 0 20px 0;
 }
-
-/* ── Column panel label */
-.panel-label {
-    font-size: 10px;
-    font-weight: 700;
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
     color: #4a5a78;
-    letter-spacing: 1.2px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+}
+.legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* ── Panel label ── */
+.panel-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: #2e3e5c;
+    letter-spacing: 1.3px;
     text-transform: uppercase;
     margin-bottom: 10px;
+    font-family: 'DM Sans', sans-serif;
 }
 
-/* ── Analyze button (gold, prominent) */
+/* ── Annotated text display panel ── */
+.text-panel {
+    background: #111827;
+    border-radius: 8px;
+    padding: 20px 24px;
+    border: 1px solid rgba(255,255,255,0.06);
+    min-height: 420px;
+    font-size: 14px;
+    line-height: 1.85;
+    color: #b8c8e0;
+    word-wrap: break-word;
+    font-family: 'DM Sans', sans-serif;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+}
+
+/* ── Analyze button (gold, prominent) ── */
 div[data-testid="stButton"] > button {
-    background-color: #e2b04a !important;
+    background: linear-gradient(135deg, #e2b04a 0%, #d4a040 100%) !important;
     color: #1a1a2e !important;
     font-weight: 700 !important;
     font-family: 'DM Sans', sans-serif !important;
     border: none !important;
-    border-radius: 6px !important;
-    transition: background-color 0.2s ease, transform 0.15s ease,
-                box-shadow 0.2s ease !important;
+    border-radius: 7px !important;
+    transition: all 0.2s ease !important;
     font-size: 13px !important;
-    letter-spacing: 0.3px !important;
+    letter-spacing: 0.4px !important;
+    box-shadow: 0 2px 8px rgba(226,176,74,0.2) !important;
+    cursor: pointer !important;
 }
-
 div[data-testid="stButton"] > button:hover {
-    background-color: #f0c060 !important;
+    background: linear-gradient(135deg, #f0c060 0%, #e2b04a 100%) !important;
     transform: translateY(-1px) !important;
-    box-shadow: 0 4px 14px rgba(226,176,74,0.35) !important;
+    box-shadow: 0 6px 18px rgba(226,176,74,0.4) !important;
+}
+div[data-testid="stButton"] > button:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 6px rgba(226,176,74,0.25) !important;
 }
 
-/* ── Edit Message button (subtle, secondary) */
+/* ── Edit Message button ── */
 div[data-testid="stButton"]:has(button[kind="secondary"]) > button {
-    background-color: transparent !important;
-    color: #7a8aaa !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
-    font-size: 12px !important;
+    background: transparent !important;
+    color: #4a5a78 !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    font-size: 11px !important;
     font-weight: 500 !important;
     box-shadow: none !important;
 }
+div[data-testid="stButton"]:has(button[kind="secondary"]) > button:hover {
+    color: #8a9ab8 !important;
+    border-color: rgba(255,255,255,0.15) !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
 
-/* ── Text area */
+/* ── Text area ── */
 .stTextArea textarea {
-    background-color: #16213e !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
+    background-color: #111827 !important;
+    border: 1px solid rgba(255,255,255,0.07) !important;
     border-radius: 8px !important;
-    color: #c8d4e8 !important;
+    color: #b8c8e0 !important;
     font-family: 'DM Sans', sans-serif !important;
     font-size: 14px !important;
-    line-height: 1.75 !important;
+    line-height: 1.8 !important;
     caret-color: #e2b04a;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
 }
-
 .stTextArea textarea:focus {
-    border-color: rgba(226,176,74,0.4) !important;
-    box-shadow: 0 0 0 2px rgba(226,176,74,0.08) !important;
+    border-color: rgba(226,176,74,0.35) !important;
+    box-shadow: 0 0 0 3px rgba(226,176,74,0.06) !important;
 }
+.stTextArea textarea::placeholder { color: #2e3e5c !important; }
 
-/* ── Selectboxes */
+/* ── Selectboxes ── */
 .stSelectbox [data-baseweb="select"] > div {
-    background-color: #16213e !important;
-    border-color: rgba(255,255,255,0.1) !important;
+    background-color: #111827 !important;
+    border-color: rgba(255,255,255,0.07) !important;
+    border-radius: 7px !important;
+    transition: border-color 0.2s ease !important;
+}
+.stSelectbox [data-baseweb="select"] > div:focus-within {
+    border-color: rgba(226,176,74,0.35) !important;
+    box-shadow: 0 0 0 3px rgba(226,176,74,0.06) !important;
+}
+.stSelectbox label {
+    color: #4a5a78 !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.5px !important;
+    text-transform: uppercase !important;
 }
 
-/* ── Divider */
-hr { border-color: rgba(255,255,255,0.07) !important; }
+/* ── Risk score chips row ── */
+.risk-chips {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+.risk-chip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: 'DM Sans', sans-serif;
+    letter-spacing: 0.3px;
+}
 
-/* ── Custom scrollbar */
-::-webkit-scrollbar       { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #16213e; }
-::-webkit-scrollbar-thumb { background: #3a4a68; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #4a5a78; }
+/* ── Divider ── */
+hr { border-color: rgba(255,255,255,0.05) !important; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar       { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2e3e5c; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #3a4e70; }
+
+/* ── Warning / error ── */
+[data-testid="stAlert"] {
+    border-radius: 8px !important;
+    font-size: 13px !important;
+    font-family: 'DM Sans', sans-serif !important;
+}
 </style>
 """,
         unsafe_allow_html=True,
@@ -405,17 +599,30 @@ def main():
     if "draft_message"  not in st.session_state:
         st.session_state.draft_message  = ""
 
-    # ── Header ────────────────────────────────────────────────────────────────
-    st.markdown('<h1 class="brand-name">LingoLink</h1>', unsafe_allow_html=True)
+    # ── Top nav bar ───────────────────────────────────────────────────────────
     st.markdown(
-        '<p class="brand-tagline">'
-        "AI-powered cross-cultural communication review for international business."
-        "</p>",
+        """
+<div class="top-nav">
+  <div class="brand-lockup">
+    <h1 class="brand-name">LingoLink</h1>
+    <span class="brand-badge">AI</span>
+    <p class="brand-tagline">Cross-cultural communication review for international business.</p>
+  </div>
+  <div class="nav-right">
+    <span class="nav-pill">26 Markets</span>
+    <span class="nav-pill">6 Risk Types</span>
+    <span class="nav-pill">Claude claude-sonnet-4-20250514</span>
+  </div>
+</div>
+""",
         unsafe_allow_html=True,
     )
 
-    # ── Controls row ──────────────────────────────────────────────────────────
-    c1, c_arr, c2, c3, c4 = st.columns([3, 0.45, 3, 3, 2])
+    # ── Controls card ─────────────────────────────────────────────────────────
+    st.markdown('<div class="controls-card">', unsafe_allow_html=True)
+    st.markdown('<p class="controls-label">Configure Analysis</p>', unsafe_allow_html=True)
+
+    c1, c_arr, c2, c3, c4 = st.columns([3, 0.4, 3, 3, 2])
 
     with c1:
         sender = st.selectbox("Sender's Country", COUNTRIES, key="sender_sel")
@@ -445,36 +652,33 @@ def main():
             key="analyze_btn",
         )
 
-    # Same-country validation banner
+    # Same-country validation
     same_country = sender == receiver
-    if same_country:
-        st.warning(
-            "⚠️  Sender and receiver countries must be different "
-            "to perform cross-cultural analysis."
+    if not same_country:
+        st.markdown(
+            f'<div style="margin-top:10px;">'
+            f'<span class="pair-badge">'
+            f'{sender} <span class="pair-arrow">→</span> {receiver}'
+            f'  ·  {scenario}'
+            f'</span></div>',
+            unsafe_allow_html=True,
         )
+    else:
+        st.warning("⚠️  Sender and receiver countries must be different.")
+
+    st.markdown('</div>', unsafe_allow_html=True)  # close controls-card
 
     # ── Severity legend ───────────────────────────────────────────────────────
     st.markdown(
         """
-<div style="display:flex;gap:18px;align-items:center;padding:8px 14px;
-     background:rgba(255,255,255,0.025);border-radius:6px;
-     border:1px solid rgba(255,255,255,0.05);margin:10px 0 18px 0;">
-  <span style="font-size:10px;font-weight:700;color:#3a4a68;letter-spacing:1px;
+<div class="legend-bar">
+  <span style="font-size:9px;font-weight:700;color:#2e3e5c;letter-spacing:1px;
         text-transform:uppercase;font-family:'DM Sans',sans-serif;">Severity</span>
-  <span style="display:flex;align-items:center;gap:5px;font-size:12px;
-        color:#8a9ab8;font-family:'DM Sans',sans-serif;">
-    <span style="width:10px;height:10px;border-radius:2px;background:#e2b04a;
-          display:inline-block;flex-shrink:0;"></span>HIGH
-  </span>
-  <span style="display:flex;align-items:center;gap:5px;font-size:12px;
-        color:#8a9ab8;font-family:'DM Sans',sans-serif;">
-    <span style="width:10px;height:10px;border-radius:2px;background:#c47c2b;
-          display:inline-block;flex-shrink:0;"></span>MEDIUM
-  </span>
-  <span style="display:flex;align-items:center;gap:5px;font-size:12px;
-        color:#8a9ab8;font-family:'DM Sans',sans-serif;">
-    <span style="width:10px;height:10px;border-radius:2px;background:#4a90b8;
-          display:inline-block;flex-shrink:0;"></span>LOW
+  <span class="legend-item"><span class="legend-dot" style="background:#e2b04a;"></span>HIGH</span>
+  <span class="legend-item"><span class="legend-dot" style="background:#c47c2b;"></span>MEDIUM</span>
+  <span class="legend-item"><span class="legend-dot" style="background:#4a90b8;"></span>LOW</span>
+  <span style="margin-left:auto;font-size:10px;color:#2e3e5c;font-family:'DM Sans',sans-serif;">
+    Highlights appear inline in your draft text
   </span>
 </div>
 """,
@@ -491,25 +695,21 @@ def main():
         has_result = st.session_state.result is not None
 
         if has_result:
-            # Show annotated (highlighted) version of the analysed text
             flags = st.session_state.result.get("flags", [])
             annotated_html = highlight_text(st.session_state.analyzed_text, flags)
             st.markdown(
                 f'<div class="text-panel">{annotated_html}</div>',
                 unsafe_allow_html=True,
             )
+            st.markdown("<br>", unsafe_allow_html=True)
             if st.button("✏️  Edit Message", key="edit_btn"):
                 st.session_state.result = None
                 st.rerun()
         else:
-            # Show editable text area; key syncs value into session state
             st.text_area(
                 label="draft",
-                height=420,
-                placeholder=(
-                    "Paste your draft email, proposal, or business "
-                    "communication here…"
-                ),
+                height=440,
+                placeholder="Paste your draft email, proposal, or business communication here…",
                 label_visibility="collapsed",
                 key="draft_message",
             )
@@ -526,15 +726,37 @@ def main():
                 st.session_state.result.get("overall_summary", "")
             )
 
+            # Risk score chips
+            if flags:
+                counts = {"HIGH": 0, "MEDIUM": 0, "LOW": 0}
+                for f in flags:
+                    sev = f.get("severity", "LOW")
+                    if sev in counts:
+                        counts[sev] += 1
+                chip_styles = {
+                    "HIGH":   "background:rgba(226,176,74,0.12);color:#e2b04a;border:1px solid rgba(226,176,74,0.2);",
+                    "MEDIUM": "background:rgba(196,124,43,0.12);color:#c47c2b;border:1px solid rgba(196,124,43,0.2);",
+                    "LOW":    "background:rgba(74,144,184,0.12);color:#4a90b8;border:1px solid rgba(74,144,184,0.2);",
+                }
+                chips_html = '<div class="risk-chips">'
+                for sev, cnt in counts.items():
+                    if cnt:
+                        chips_html += (
+                            f'<span class="risk-chip" style="{chip_styles[sev]}">'
+                            f'{cnt} {sev}</span>'
+                        )
+                chips_html += "</div>"
+                st.markdown(chips_html, unsafe_allow_html=True)
+
             # Overall summary card
             st.markdown(
                 f"""
-<div style="background:rgba(226,176,74,0.08);border-left:3px solid #e2b04a;
-     border-radius:6px;padding:14px 18px;margin-bottom:18px;">
-  <div style="font-size:10px;font-weight:700;color:#e2b04a;letter-spacing:1px;
-       text-transform:uppercase;margin-bottom:6px;
-       font-family:'DM Sans',sans-serif;">Overall Assessment</div>
-  <p style="color:#c8d4e8;font-size:13px;line-height:1.65;margin:0;
+<div style="background:rgba(226,176,74,0.06);border:1px solid rgba(226,176,74,0.12);
+     border-left:3px solid #e2b04a;border-radius:8px;padding:14px 16px;margin-bottom:16px;">
+  <div style="font-size:9px;font-weight:700;color:#8a6a20;letter-spacing:1px;
+       text-transform:uppercase;margin-bottom:7px;font-family:'DM Sans',sans-serif;">
+       Overall Assessment</div>
+  <p style="color:#b0a080;font-size:13px;line-height:1.7;margin:0;
      font-family:'DM Sans',sans-serif;">{summary}</p>
 </div>
 """,
@@ -544,19 +766,19 @@ def main():
             if flags:
                 count = len(flags)
                 st.markdown(
-                    f'<p style="font-size:11px;color:#4a5a78;margin:0 0 10px;'
+                    f'<p style="font-size:10px;color:#2e3e5c;margin:0 0 12px;'
                     f'letter-spacing:0.3px;font-family:\'DM Sans\',sans-serif;">'
-                    f'{count} issue{"s" if count != 1 else ""} identified</p>',
+                    f'{count} issue{"s" if count != 1 else ""} identified — review each before sending</p>',
                     unsafe_allow_html=True,
                 )
-                for flag in flags:
-                    st.markdown(render_flag_card(flag), unsafe_allow_html=True)
+                for i, flag in enumerate(flags):
+                    st.markdown(render_flag_card(flag, i), unsafe_allow_html=True)
             else:
                 st.markdown(
                     """
-<div style="background:rgba(74,160,100,0.07);border-left:3px solid #4aa064;
-     border-radius:6px;padding:14px 16px;">
-  <p style="color:#7ab894;font-size:13px;margin:0;line-height:1.6;
+<div style="background:rgba(74,160,100,0.06);border-left:3px solid #4aa064;
+     border-radius:8px;padding:14px 16px;border:1px solid rgba(74,160,100,0.1);">
+  <p style="color:#5a9a74;font-size:13px;margin:0;line-height:1.65;
      font-family:'DM Sans',sans-serif;">
     ✓ No cross-cultural risk flags identified for this pairing and scenario.
   </p>
@@ -564,17 +786,37 @@ def main():
                     unsafe_allow_html=True,
                 )
         else:
-            # Empty-state placeholder
+            # Empty state
             st.markdown(
                 """
-<div style="text-align:center;padding:64px 20px 40px;">
-  <div style="font-size:2.4rem;opacity:0.13;margin-bottom:14px;">🌐</div>
-  <p style="font-size:13px;color:#3a4a68;line-height:1.8;margin:0;
+<div style="text-align:center;padding:56px 20px 40px;">
+  <div style="width:48px;height:48px;border-radius:50%;background:rgba(226,176,74,0.06);
+       border:1px solid rgba(226,176,74,0.1);display:inline-flex;align-items:center;
+       justify-content:center;font-size:1.5rem;margin-bottom:18px;opacity:0.6;">🌐</div>
+  <p style="font-size:13px;color:#2e3e5c;line-height:1.9;margin:0 0 20px;
      font-family:'DM Sans',sans-serif;">
-    Select countries and a scenario,<br>
-    paste your draft in the left panel,<br>
-    then click <strong style="color:#e2b04a;">Analyze&nbsp;Message</strong>.
+    Select sender &amp; receiver countries,<br>
+    choose a scenario, paste your draft,<br>
+    then click <strong style="color:#4a5a78;font-weight:600;">Analyze Message</strong>.
   </p>
+  <div style="display:inline-flex;flex-direction:column;gap:6px;text-align:left;">
+    <div style="font-size:11px;color:#2a3a58;font-family:'DM Sans',sans-serif;
+         display:flex;align-items:center;gap:7px;">
+      <span style="color:#e2b04a;opacity:0.4;">◈</span> Face &amp; status risk detection
+    </div>
+    <div style="font-size:11px;color:#2a3a58;font-family:'DM Sans',sans-serif;
+         display:flex;align-items:center;gap:7px;">
+      <span style="color:#e2b04a;opacity:0.4;">⇄</span> Directness calibration
+    </div>
+    <div style="font-size:11px;color:#2a3a58;font-family:'DM Sans',sans-serif;
+         display:flex;align-items:center;gap:7px;">
+      <span style="color:#e2b04a;opacity:0.4;">△</span> Hierarchy &amp; formality checks
+    </div>
+    <div style="font-size:11px;color:#2a3a58;font-family:'DM Sans',sans-serif;
+         display:flex;align-items:center;gap:7px;">
+      <span style="color:#e2b04a;opacity:0.4;">◷</span> Urgency pressure flags
+    </div>
+  </div>
 </div>""",
                 unsafe_allow_html=True,
             )
